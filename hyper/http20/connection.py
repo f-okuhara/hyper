@@ -768,42 +768,42 @@ class HTTP20Connection(object):
                 self.recent_recv_streams.discard(stream_id)
                 return
 
-            # make sure to validate the stream is readable.
-            # if the connection was reset, this stream id won't appear in
-            # self.streams and will cause this call to raise an exception.
-            if stream_id:
-                self._get_stream(stream_id)
+        # make sure to validate the stream is readable.
+        # if the connection was reset, this stream id won't appear in
+        # self.streams and will cause this call to raise an exception.
+        if stream_id:
+            self._get_stream(stream_id)
 
-            # TODO: Re-evaluate this.
-            self._single_read()
-            count = 9
-            retry_wait = 0.05  # can improve responsiveness to delay the retry
+        # TODO: Re-evaluate this.
+        self._single_read()
+        count = 9
+        retry_wait = 0.05  # can improve responsiveness to delay the retry
 
-            while count and self._sock is not None and self._sock.can_read:
-                # If the connection has been closed, bail out, but retry
-                # on transient errors.
-                try:
-                    self._single_read()
-                except ConnectionResetError:
+        while count and self._sock is not None and self._sock.can_read:
+            # If the connection has been closed, bail out, but retry
+            # on transient errors.
+            try:
+                self._single_read()
+            except ConnectionResetError:
+                break
+            except ssl.SSLError as e:  # pragma: no cover
+                # these are transient errors that can occur while reading
+                # from ssl connections.
+                if e.args[0] in TRANSIENT_SSL_ERRORS:
+                    continue
+                else:
+                    raise
+            except socket.error as e:  # pragma: no cover
+                if e.errno in (errno.EINTR, errno.EAGAIN):
+                    # if 'interrupted' or 'try again', continue
+                    time.sleep(retry_wait)
+                    continue
+                elif e.errno == errno.ECONNRESET:
                     break
-                except ssl.SSLError as e:  # pragma: no cover
-                    # these are transient errors that can occur while reading
-                    # from ssl connections.
-                    if e.args[0] in TRANSIENT_SSL_ERRORS:
-                        continue
-                    else:
-                        raise
-                except socket.error as e:  # pragma: no cover
-                    if e.errno in (errno.EINTR, errno.EAGAIN):
-                        # if 'interrupted' or 'try again', continue
-                        time.sleep(retry_wait)
-                        continue
-                    elif e.errno == errno.ECONNRESET:
-                        break
-                    else:
-                        raise
+                else:
+                    raise
 
-                count -= 1
+            count -= 1
 
     def _send_rst_frame(self, stream_id, error_code):
         """
