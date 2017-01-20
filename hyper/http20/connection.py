@@ -374,6 +374,8 @@ class HTTP20Connection(object):
             else:
                 proto = H2C_PROTOCOL
 
+            sock.setblocking(0)
+
             log.debug("Selected NPN protocol: %s", proto)
             assert proto in H2_NPN_PROTOCOLS or proto == H2C_PROTOCOL
 

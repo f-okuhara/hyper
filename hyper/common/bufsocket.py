@@ -12,6 +12,7 @@ process.
 """
 import select
 from .exceptions import ConnectionResetError, LineTooLongError
+from ssl import SSLWantReadError
 
 
 class BufferedSocket(object):
@@ -164,7 +165,14 @@ class BufferedSocket(object):
         if not self._remaining_capacity:
             self.new_buffer()
 
-        count = self._sck.recv_into(self._buffer_view[self._buffer_end:])
+        while True:
+            try:
+                count = self._sck.recv_into(self._buffer_view[self._buffer_end:])
+                break
+            except SSLWantReadError:
+                return
+            except BlockingIOError:
+                continue
         if not count:
             raise ConnectionResetError()
 
