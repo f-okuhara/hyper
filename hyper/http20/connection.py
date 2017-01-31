@@ -287,6 +287,38 @@ class HTTP20Connection(object):
 
             return stream_id
 
+    def request_chunked(self, method, url, body=None, headers=None):
+        headers = dict(headers or {})
+        with self._write_lock:
+            stream_id = self.putrequest(method, url)
+
+            default_headers = (':method', ':scheme', ':authority', ':path')
+            for name, value in headers.items():
+                is_default = to_native_string(name) in default_headers
+                self.putheader(name, value, stream_id, replace=is_default)
+
+            self.connect()
+
+            stream = self._get_stream(stream_id)
+
+            stream.send_headers(False)
+
+        # Send whatever data we have.
+        if body:
+            prev_chunk = None
+            for chunk in body:
+                if prev_chunk:
+                    with self._write_lock:
+                        # TODO: use _send_chunk instead of send_data
+                        stream.send_data(prev_chunk, False)
+                prev_chunk = chunk
+            with self._write_lock:
+                # TODO: use _send_chunk instead of send_data
+                stream.send_data(prev_chunk, True)
+
+        self._send_outstanding_data()
+        return stream_id
+
     def _get_stream(self, stream_id):
         if stream_id is None:
             return self.recent_stream
