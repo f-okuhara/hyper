@@ -309,12 +309,10 @@ class HTTP20Connection(object):
             for chunk in body:
                 if prev_chunk:
                     with self._write_lock:
-                        # TODO: use _send_chunk instead of send_data
-                        stream.send_data(prev_chunk, False)
+                        stream._send_chunk(prev_chunk, False)
                 prev_chunk = chunk
             with self._write_lock:
-                # TODO: use _send_chunk instead of send_data
-                stream.send_data(prev_chunk, True)
+                stream._send_chunk(prev_chunk, True)
 
         self._send_outstanding_data()
         return stream_id
