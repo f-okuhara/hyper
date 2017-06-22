@@ -699,7 +699,13 @@ class HTTP20Connection(object):
         with self._read_lock:
             if self._sock is None:
                 raise ConnectionError('tried to read after connection close')
-            self._sock.fill()
+            while True:
+                try:
+                    self._sock.fill()
+                    break
+                except ssl.SSLWantWriteError:
+                    log.info("SSLWantWriteError occard.")
+                    time.sleep(0.1)
             data = self._sock.buffer.tobytes()
             self._sock.advance_buffer(len(data))
             with self._conn as conn:
